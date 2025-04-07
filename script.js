@@ -1,26 +1,41 @@
 const { createFFmpeg, fetchFile } = FFmpeg;
+
 const ffmpeg = createFFmpeg({
   log: true,
-  corePath: 'https://unpkg.com/@ffmpeg/ffmpeg@0.10.0/dist/ffmpeg.min.js',
+  corePath: 'https://unpkg.com/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js',
   mainName: 'main',
-  worker: false,
+  worker: false, // ⚠️ must be false to avoid SharedArrayBuffer requirement
 });
-
 
 document.getElementById('convertBtn').onclick = async () => {
   const file = document.getElementById('uploader').files[0];
   if (!file) return alert('Select a file first!');
 
-  document.getElementById('status').textContent = 'Loading FFmpeg...';
-  if (!ffmpeg.isLoaded()) await ffmpeg.load();
+  const status = document.getElementById('status');
+  status.textContent = 'Loading FFmpeg...';
+
+  if (!ffmpeg.isLoaded()) {
+    try {
+      await ffmpeg.load();
+    } catch (err) {
+      status.textContent = 'Failed to load FFmpeg 😢';
+      console.error(err);
+      return;
+    }
+  }
 
   ffmpeg.FS('writeFile', 'input.avi', await fetchFile(file));
 
-  document.getElementById('status').textContent = 'Converting...';
-  await ffmpeg.run('-i', 'input.avi', 'output.mp4');
+  status.textContent = 'Converting...';
+  try {
+    await ffmpeg.run('-i', 'input.avi', 'output.mp4');
+  } catch (err) {
+    status.textContent = 'Conversion failed.';
+    console.error(err);
+    return;
+  }
 
   const data = ffmpeg.FS('readFile', 'output.mp4');
-               
   const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
 
   const a = document.createElement('a');
@@ -29,18 +44,5 @@ document.getElementById('convertBtn').onclick = async () => {
   a.textContent = 'Download converted MP4';
   document.body.appendChild(a);
 
-  document.getElementById('status').textContent = 'Done!';
+  status.textContent = 'Done!';
 };
-
-// const fs = require('fs');
-// const { createFFmpeg, fetchFile } = require('@ffmpeg/ffmpeg');
-
-// const ffmpeg = createFFmpeg({ log: true });
-
-// (async () => {
-//   await ffmpeg.load();
-//   ffmpeg.FS('writeFile', 'test.avi', await fetchFile('./test.avi'));
-//   await ffmpeg.run('-i', 'test.avi', 'test.mp4');
-//   await fs.promises.writeFile('./test.mp4', ffmpeg.FS('readFile', 'test.mp4'));
-//   process.exit(0);
-// })();
